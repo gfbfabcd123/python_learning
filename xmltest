@@ -1,0 +1,121 @@
+package com.huquanyu.xmltest1;
+
+import com.google.gson.JsonObject;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+
+/**
+ * @author happy
+ * @since 2020-06-15 1:00
+ */
+
+public class XmlHandler extends DefaultHandler {
+
+    public static boolean nowStartTag;
+    public static String fieldValue;
+    public static boolean fHasValue;
+    public static LinkedList<String> mainQnameList;
+    public static LinkedList<Boolean> isListTagList;
+    public static String latest;
+    public static Map<String,String> attrMap;
+    public static StringBuilder sb;
+
+
+    static {
+        nowStartTag = false;
+        mainQnameList = new LinkedList<>();
+        isListTagList = new LinkedList<>();
+        fieldValue = "";
+        fHasValue = false;
+        latest = "";
+        sb = new StringBuilder();
+        attrMap = new HashMap<>();
+    }
+    @Override
+    public void startElement(String uri, String localName, String qName, Attributes attributes){
+        mainQnameList.add(qName);
+        buildStart(qName);
+        if (attributes.getLength() > 0){
+            for (int index = 0; index < attributes.getLength(); index ++){
+                String attrName = attributes.getQName(index);
+                String attrValue = attributes.getValue(index);
+                attrMap.put(attrName,attrValue);
+            }
+        }
+        nowStartTag = true;
+    }
+
+
+
+    @Override
+    public void characters(char[] ch, int start, int length) throws SAXException {
+        fHasValue = true;
+        String s = new String(ch, start, length);
+        System.out.println("char::"+s);
+        if(s.matches("^\\s*$")){
+            s="";
+        }
+        fieldValue = fieldValue + s;
+    }
+
+    @Override
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+        if (nowStartTag){
+            if (fHasValue){
+                sb.append("\"" + fieldValue +"\"");
+            }else {
+                sb.append("{");
+                for (Map.Entry<String, String> entry : attrMap.entrySet()) {
+                    String kv = buildKV(entry);
+                    sb.append(kv +",");
+                }
+                sb.deleteCharAt(sb.length()-1).append("}");
+            }
+        } else {
+            if(isListTagList.removeLast()){
+                sb.append("]");
+            }
+            sb.append("}");
+        }
+        mainQnameList.removeLast();
+        fieldValue = "";
+        fHasValue = false;
+        if (mainQnameList.size() == 0){
+            System.out.println(sb.toString());
+        }
+    }
+
+    private void buildStart(String qName) {
+        if (nowStartTag){
+            sb.append("{");
+            if (!attrMap.isEmpty()){
+                for (Map.Entry<String, String> entry : attrMap.entrySet()) {
+                    String kv = buildKV(entry);
+                    sb.append(kv);
+                }
+                attrMap.clear();
+            }
+
+        } else {
+            sb.append(",");
+        }
+        sb.append("\"" + qName + "\"" +":");
+        if (qName.endsWith("List")){
+            sb.append("[");
+            isListTagList.add(true);
+        }else {
+            isListTagList.add(false);
+        }
+        attrMap.clear();
+    }
+
+    private String buildKV(Map.Entry<String,String> entry) {
+        String kv = "\""+entry.getKey()+"\"" +":" + "\""+entry.getValue()+"\"" +",";
+        return kv;
+    }
+}
